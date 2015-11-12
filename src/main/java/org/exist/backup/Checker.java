@@ -53,18 +53,46 @@ public class Checker {
             super.startElement(uri, localName, qName, attributes);
 
             if ("resource".equals(qName)) {
-                String type = attributes.getValue("type");
-                if ("XMLResource".equals(type)) {
-                    String filename = attributes.getValue("filename");
-                    if (filename != null) {
-                        checkXml(location.resolve(filename));
+                String filename = attributes.getValue("filename");
+                if (filename == null) {
+                    System.out.println("'resource' without 'filename' at " + location);
+
+                } else {
+                    Path file = location.resolve(filename);
+
+                    String type = attributes.getValue("type");
+                    if ("XMLResource".equals(type)) {
+                        checkXml(file);
+                    } else {
+                        if (!Files.isRegularFile(file)) {
+                            System.out.println(file+" is missing.");
+                        }
                     }
+                }
+            } else if ("subcollection".equals(qName)) {
+                String filename = attributes.getValue("filename");
+                if (filename != null) {
+                    Path folder = location.resolve(filename);
+                    if (Files.isDirectory(folder)) {
+                        Path metaFile = folder.resolve("__contents__.xml");
+                        if (!Files.isRegularFile(metaFile)) {
+                            System.out.println("'subcollection' "+folder+" have no metadata.");
+                        }
+                    } else {
+                        System.out.println("'subcollection' "+folder+" does not exist, but present at metadata.");
+                    }
+                } else {
+                    System.out.println("'subcollection' without 'filename' at "+location);
                 }
             }
         }
     }
 
     public static void main(String[] args) throws Exception {
+        //do not do DTD validation
+        factory.setValidating(false);
+        factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+
         Checker.check(Paths.get(args[0]));
     }
 
