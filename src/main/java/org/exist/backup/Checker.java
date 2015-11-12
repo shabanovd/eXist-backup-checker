@@ -19,6 +19,8 @@
  */
 package org.exist.backup;
 
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import javax.xml.parsers.SAXParser;
@@ -38,8 +40,47 @@ public class Checker {
     static SAXParserFactory factory = SAXParserFactory.newInstance();
     static DefaultHandler handler = new DefaultHandler();
 
+    static class MetadataHandler extends  DefaultHandler {
+
+        Path location;
+
+        MetadataHandler(Path location) {
+            this.location = location;
+        }
+
+        @Override
+        public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
+            super.startElement(uri, localName, qName, attributes);
+
+            if ("resource".equals(qName)) {
+                String type = attributes.getValue("type");
+                if ("XMLResource".equals(type)) {
+                    String filename = attributes.getValue("filename");
+                    if (filename != null) {
+                        checkXml(location.resolve(filename));
+                    }
+                }
+            }
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         Checker.check(Paths.get(args[0]));
+    }
+
+    private static void checkXml(Path file) {
+        SAXParser saxParser;
+        try {
+            saxParser = factory.newSAXParser();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        try (InputStream in = Files.newInputStream(file)) {
+            saxParser.parse(in, handler);
+        } catch (Exception e) {
+            System.out.println(file.toString()+" "+e.getMessage());
+        }
     }
 
     private static void checkContents(Path file) {
@@ -51,7 +92,7 @@ public class Checker {
         }
 
         try (InputStream in = Files.newInputStream(file)) {
-            saxParser.parse(in, handler);
+            saxParser.parse(in, new MetadataHandler(file.getParent()));
         } catch (Exception e) {
             System.out.println(file.toString()+" "+e.getMessage());
         }
